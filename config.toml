@@ -1,0 +1,7 @@
+baseURL = 'http://example.org/'
+languageCode = 'en-us'
+title = 'Software Desgin'
+theme = "hugo-book"
+
+[params]
+BookSection = "posts"
