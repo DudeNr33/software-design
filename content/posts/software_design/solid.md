@@ -19,6 +19,20 @@ draft: true
 They are six of the most fundamental design principles on the module and class level.
 In the following, _module_ can always be exchanged with _class_ as well.
 
+We will demonstrate the different principles by applying them to an example.
+As a starting point, imagine a web client class that handles web requests and keeps track of
+the requested resources and responses. The tracked requests can be printed in a report.  
+In a first draft, the implementation could look like this:
+
+{{< plantuml id="Starting Point" >}}
+class WebClient {
+    tracked_requests: List
+    request(method, url, headers, body) -> response
+    track_request(method, url, response) -> None
+    print_report(outputfile) -> None
+}
+{{< /plantuml >}}
+
 ## Single Responsibility Principle
 
 ### Summary
@@ -37,9 +51,43 @@ may only be discovered when it is too late.
 
 ### Example
 
-Consider a class that takes care of aggregating some data and printing a summary report of said data.
-This class class violates the SRP, as data aggregation and report generation are two separate activities
-with different reasons to initiate changes.
+In our example, the `WebClient` has three different responsibilities:
+1. Handling of web requests
+2. Data aggregation
+3. Reporting of said data
+
+All of these can change for different reasons:
+* A user could ask for the implementation of a retry mechanism when handling web requests
+* A user could ask for persistent storage of the aggregated data
+* A user could ask for a change in the report format
+
+It is therefore better to separate all of these concerns into different classes:
+
+{{< plantuml id="Refactor towards SRP" >}}
+class WebClient {
+    tracker: RequestTracker
+    reporter: TextReporter
+    request(method, url, headers, body) -> response
+    print_report(outputfile)
+}
+
+class RequestTracker {
+    tracked_requests: List
+    track_request(method, url, response)
+}
+
+class TextReporter {
+    tracker: RequestTracker
+    print_report(outputfile)
+}
+
+WebClient --> RequestTracker : use
+WebClient --> TextReporter : use
+TextReporter --> RequestTracker : use
+{{< /plantuml >}}
+
+We have chosen to let our central `WebClient` class act as a facade to the now decoupled `TextReporter`, so that users of the original implementation
+don't have to change the way they use our `WebClient`.
 
 ## Open Closed Principle
 
@@ -66,7 +114,50 @@ The goal is to identify points of predicted variation and create a stable interf
 Modification of existing code means that dependent client modules might have to change as well, resulting in a large changeset for a simple new feature.
 
 Additionally, changes in existing code always holds the danger of regression bugs.
+
 ### Example
+
+Imagine that our request-tracking web client becomes more popular, and a simple textual output is not enough anymore.
+A more user-friendly HTML report must be implemented. In the future other report formats might be requested.  
+Adding other report formats to our current design would require a change to `WebClient`, as it holds a direct reference to the concrete
+implementation of the reporter class. By creating an abstract base class `FileBasedReporter` that defines only the interface, we can rely on this
+abstraction rather than the concrete implementations:
+
+{{< plantuml id="Refactor towards OCP" >}}
+class WebClient {
+    tracker: RequestTracker
+    reporter: TextReporter
+    request(method, url, headers, body) -> response
+    print_report(outputfile)
+}
+
+class RequestTracker {
+    tracked_requests: List
+    track_request(method, url, response)
+}
+
+abstract FileBasedReporter {
+    tracker: RequestTracker
+    print_report(outputfile)
+}
+
+class TextReporter {
+}
+
+class HTMLReporter {
+}
+
+WebClient -down-> RequestTracker : use
+WebClient -right-> FileBasedReporter : use
+FileBasedReporter -down-> RequestTracker : use
+TextReporter -up-|> FileBasedReporter : implements
+HTMLReporter -up-|> FileBasedReporter : implements
+{{< /plantuml >}}
+
+The concrete `FileBasedReporter` implementation could be provided by configuration, or by passing the implementation to the constructor of `WebClient`.  
+Our `WebClient` is now closed against modifications due to changes in the reporting format, and the design is open for extensions.
+
+A similar approach can be taken for the `RequestTracker`, for example if variants like `InMemoryRequestTracker` or `PersistentRequestTracker` become necessary.
 
 ## Liskov Substitution Principle
 
