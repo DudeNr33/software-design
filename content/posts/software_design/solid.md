@@ -163,9 +163,64 @@ A similar approach can be taken for the `RequestTracker`, for example if variant
 
 ### Summary
 
+> *If for each object o1 of type S there is an object o2 of type T such that for all programs P defined in terms of T, the behavior of P is unchanged when o1 is substituted for oz, then S is a subtype of T* [^3]
+
+This is very mathematical. The LSP is about *strong behavioral subtyping*. In other words, it means that if you substitute an object in your code with an object of a subtype, the program must not break. *Object* can mean any entity that has an interface, be it simple class objects or REST interfaces.
+
+To satisfy the LSP, the interface must fulfill the following:
+* It accepts the same input parameters with the same or broader parameter types
+* It returns an object of the same or a more specific type
+* It throws only the same or more specific exceptions during execution
+* It has the same side effects
+
+The first two and maybe the third can be validated by a compiler or static analysis tool. The last requires validation through code reviews or unit tests.
+
 ### Problems of violating the principle
 
+Violations of the LSP can lead to unexpected crashes or behaviour during runtime.
+In code, they typically manifest in special cases, `if`/`else` blocks and type checks when dealing with subtypes that do not conform to the LSP.
+
 ### Example
+
+Our example code does not violate the LSP, so lets think about something that *would*:
+{{< plantuml id="Refactor towards LSP" >}}
+class WebClient {
+    tracker: RequestTracker
+    reporter: TextReporter
+    request(method, url, headers, body) -> response
+    print_report(outputfile)
+}
+
+class RequestTracker {
+    tracked_requests: List
+    track_request(method, url, response)
+}
+
+abstract FileBasedReporter {
+    tracker: RequestTracker
+    print_report(outputfile)
+}
+
+class TextReporter {
+}
+
+class HTMLReporter {
+}
+
+class PDFReporter ##[bold]red {
+    print_report(dpi, outputfile)
+}
+note bottom of PDFReporter
+    The <i>print_report</i> method signature is changed
+end note
+
+WebClient -down-> RequestTracker : use
+WebClient -right-> FileBasedReporter : use
+FileBasedReporter -down-> RequestTracker : use
+TextReporter -up-|> FileBasedReporter : implements
+HTMLReporter -up-|> FileBasedReporter : implements
+PDFReporter -up-|> FileBasedReporter : implements
+{{< /plantuml >}}
 
 ## Interface Segregation Principle
 
@@ -187,3 +242,4 @@ A similar approach can be taken for the `RequestTracker`, for example if variant
 
 [^1]: Martin, Robert C. *Clean Architecture: A Craftsman's Guide to Software Structure and Design*. Prentice Hall. ISBN-13: 978-0-13-449416-6
 [^2]: Mayer, Bertrand (1988). *Object-Oriented Software Construction.* Prentice Hall. ISBN 0-13-629049-3.
+[^3]: Liskov, Barbara (1988). *Keynote address — data abstraction and hierarchy* ACM SIGPLAN Notices. https://dl.acm.org/doi/pdf/10.1145/62139.62141
